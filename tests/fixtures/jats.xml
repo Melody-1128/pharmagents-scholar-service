@@ -1,0 +1,13 @@
+<article>
+  <front><article-meta>
+    <title-group><article-title>A test cancer paper</article-title></title-group>
+    <abstract><p>Structured abstract text.</p></abstract>
+  </article-meta></front>
+  <body>
+    <sec><title>Introduction</title><p>Introductory text about KRAS.</p></sec>
+    <sec><title>Materials and Methods</title><p>Experimental methods.</p></sec>
+    <sec><title>Results</title><p>Important results.</p></sec>
+    <sec><title>Discussion</title><p>Interpretation of results.</p></sec>
+  </body>
+  <back><ref-list><ref><mixed-citation>Reference one.</mixed-citation></ref></ref-list></back>
+</article>

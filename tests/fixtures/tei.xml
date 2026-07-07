@@ -1,0 +1,10 @@
+<TEI xmlns="http://www.tei-c.org/ns/1.0">
+  <teiHeader>
+    <fileDesc><titleStmt><title>TEI test paper</title></titleStmt></fileDesc>
+    <profileDesc><abstract><p>TEI abstract.</p></abstract></profileDesc>
+  </teiHeader>
+  <text><body>
+    <div><head>Introduction</head><p>TEI introduction.</p></div>
+    <div><head>Results</head><p>TEI results.</p></div>
+  </body></text>
+</TEI>
