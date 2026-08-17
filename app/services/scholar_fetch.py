@@ -105,7 +105,14 @@ class ScholarFetchService:
         if paper.doi or request.doi:
             doi = paper.doi or request.doi
             try:
-                candidates.extend(await self.unpaywall.resolve(doi))
+                unpaywall_result = await self.unpaywall.resolve(doi)
+                candidates.extend(unpaywall_result.candidates)
+                # Backfill the OA claim: Unpaywall knows about publisher-hosted
+                # (hybrid/gold) OA that Crossref/Europe PMC may not report. This
+                # is the bibliographic OA claim only; it does not assert the
+                # pipeline can retrieve the file (see full_text_retrievable).
+                if unpaywall_result.is_oa:
+                    paper.is_open_access = True
             except Exception as exc:
                 warnings.append(f"Unpaywall failed: {type(exc).__name__}: {exc}")
             try:
@@ -152,7 +159,7 @@ class ScholarFetchService:
                 warnings.append(
                     f"{candidate.source} {candidate.format} failed: {type(exc).__name__}: {exc}"
                 )
-        response = self._abstract_only(paper, warnings)
+        response = self._no_full_text(paper, warnings)
         return self._cache(key, response)
 
     async def _fetch_candidate(
@@ -298,22 +305,45 @@ class ScholarFetchService:
             for section in sections
         )
 
-    def _abstract_only(self, paper: PaperMetadata, warnings: list[str]) -> ScholarFetchResponse:
-        content = self._sections_to_content([
-            FullTextSection(
-                section_type="abstract", heading="Abstract", text=paper.abstract
+    def _no_full_text(self, paper: PaperMetadata, warnings: list[str]) -> ScholarFetchResponse:
+        """Return the correct no-full-text status.
+
+        Invariant enforced here:
+            abstract_only  => non-empty abstract AND content_length > 0
+            metadata_only  => paper located but no readable abstract/full text
+                              (content may be empty)
+
+        The previous implementation always returned ``abstract_only`` even when
+        the abstract was empty, producing the impossible ``abstract_only`` +
+        ``content_length == 0`` state. Callers relied on that status to describe
+        evidence "according to the abstract" when there was none.
+        """
+        abstract_text = (paper.abstract or "").strip()
+        if abstract_text:
+            content = self._sections_to_content([
+                FullTextSection(
+                    section_type="abstract", heading="Abstract", text=paper.abstract
+                )
+            ])
+            status = "abstract_only"
+            note = "No open full text found; a non-empty abstract is available."
+        else:
+            content = ""
+            status = "metadata_only"
+            note = (
+                "No open full text and no readable abstract were obtained; "
+                "only bibliographic metadata is available."
             )
-        ]) if paper.abstract else ""
         response = ScholarFetchResponse(
             paper=paper,
-            full_text_status="abstract_only",
+            full_text_status=status,
             retrieval=RetrievalInfo(
                 source=paper.server or next(iter(paper.source_hits), "metadata"),
-                format="abstract",
+                format="abstract" if status == "abstract_only" else "metadata",
                 url=paper.landing_url,
             ) if paper.is_preprint else None,
             content=content,
-            warnings=warnings + ["No open full text found."],
+            warnings=warnings + [note],
         )
         if self.settings.app_env.lower() != "dev":
             response.paper.field_sources = None

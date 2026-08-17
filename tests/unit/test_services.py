@@ -9,7 +9,7 @@ from app.models.requests import ScholarFetchRequest, ScholarSearchRequest
 from app.providers.crossref import CrossrefProvider
 from app.providers.base import RawPaperResult
 from app.providers.europepmc import EuropePMCProvider
-from app.providers.unpaywall import UnpaywallProvider
+from app.providers.unpaywall import UnpaywallProvider, UnpaywallResult
 from app.services.resolver import MetadataResolver
 from app.services.scholar_fetch import ScholarFetchService
 from app.services.scholar_search import ScholarSearchService
@@ -316,7 +316,7 @@ async def test_preprint_fetch_falls_back_to_abstract_and_links():
 
 class NoopUnpaywall:
     async def resolve(self, doi):
-        return []
+        return UnpaywallResult()
 
 
 class NoopCrossref:

@@ -1,4 +1,7 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, computed_field
+
+# Formats the current fetch pipeline knows how to parse.
+_SUPPORTED_FETCH_FORMATS = {"xml", "html", "pdf"}
 
 
 class FullTextCandidate(BaseModel):
@@ -8,6 +11,20 @@ class FullTextCandidate(BaseModel):
     priority: int = 100
     url: str | None = None
     license: str | None = None
+
+    def is_fetchable(self) -> bool:
+        """Whether the current fetch pipeline would attempt this candidate.
+
+        A conservative, provider-agnostic gate: the access check must pass
+        (``open``) and the format must be one the parsers support. It does NOT
+        promise the fetch will succeed — only ``full_text_status == "success"``
+        means full text was actually retrieved and parsed.
+        """
+        return (
+            self.access_type == "open"
+            and self.format in _SUPPORTED_FETCH_FORMATS
+            and bool(self.url)
+        )
 
 
 class PaperMetadata(BaseModel):
@@ -34,6 +51,10 @@ class PaperMetadata(BaseModel):
     review_status: str | None = None
     citation_count: int | None = None
     is_open_access: bool = False
+    # Legacy flag kept for backward compatibility. Historically it meant
+    # "a full-text candidate exists" (bool(full_text_candidates)); it never
+    # guaranteed the pipeline could actually retrieve the text. Prefer the
+    # explicit computed flags below. See INFORMATION_SOURCE_2 report.
     has_full_text: bool = False
     full_text_candidates: list[FullTextCandidate] = Field(default_factory=list)
     source_hits: list[str] = Field(default_factory=list)
@@ -42,3 +63,23 @@ class PaperMetadata(BaseModel):
     score: float = 0.0
     query_relevance: float = 0.0
     biomedical_score: float = 0.0
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def has_full_text_candidate(self) -> bool:
+        """At least one full-text candidate was discovered by search/retrieval.
+
+        This is the honest meaning of the legacy ``has_full_text`` flag. It does
+        NOT mean the text is obtainable — only that a candidate link exists.
+        """
+        return bool(self.full_text_candidates)
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def full_text_retrievable(self) -> bool:
+        """At least one candidate the current fetch pipeline would attempt.
+
+        Still not a success guarantee; only ``full_text_status == "success"``
+        confirms full text was retrieved and parsed.
+        """
+        return any(c.is_fetchable() for c in self.full_text_candidates)
