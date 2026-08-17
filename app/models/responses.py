@@ -35,6 +35,9 @@ class SearchPaperMetadata(BaseModel):
     citation_count: int | None = None
     is_open_access: bool = False
     has_full_text: bool = False
+    # Split full-text semantics (mirror the computed flags on PaperMetadata).
+    has_full_text_candidate: bool = False
+    full_text_retrievable: bool = False
 
 
 class PaperSearchResponse(BaseModel):
